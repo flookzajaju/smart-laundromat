@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>เข้าสู่ระบบ</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: sans-serif;
+            background: linear-gradient(135deg, #E1F5EE 0%, #f5f5f5 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .card {
+            background: white; border-radius: 16px;
+            padding: 2.5rem; width: 360px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+        }
+        .logo {
+            text-align: center; margin-bottom: 2rem;
+        }
+        .logo h1 {
+            font-size: 22px; font-weight: 500;
+            color: #1D9E75; margin-top: 8px;
+        }
+        .logo p { font-size: 13px; color: #888; margin-top: 4px; }
+
+        label {
+            display: block; font-size: 13px;
+            color: #555; margin-bottom: 6px;
+        }
+        input {
+            width: 100%; padding: 10px 14px;
+            border: 1px solid #e0e0e0; border-radius: 8px;
+            font-size: 14px; margin-bottom: 1rem;
+            transition: border-color 0.2s;
+            outline: none;
+        }
+        input:focus { border-color: #1D9E75; }
+
+        .btn {
+            width: 100%; padding: 12px;
+            background: #1D9E75; color: white;
+            border: none; border-radius: 8px;
+            font-size: 15px; cursor: pointer;
+            font-weight: 500; transition: background 0.2s;
+        }
+        .btn:hover { background: #0F6E56; }
+
+        .alert {
+            padding: 10px 14px; border-radius: 8px;
+            font-size: 13px; margin-bottom: 1rem;
+            text-align: center;
+        }
+        .alert-error { background: #FCEBEB; color: #A32D2D; }
+        .alert-success { background: #E1F5EE; color: #0F6E56; }
+
+        .divider {
+            text-align: center; font-size: 13px;
+            color: #aaa; margin: 1.25rem 0;
+        }
+        .link-btn {
+            display: block; width: 100%; padding: 11px;
+            border: 1.5px solid #1D9E75; color: #1D9E75;
+            border-radius: 8px; font-size: 14px;
+            text-align: center; text-decoration: none;
+            font-weight: 500; transition: all 0.2s;
+        }
+        .link-btn:hover {
+            background: #E1F5EE;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+
+    <div class="logo">
+        <div style="font-size:40px;">🧺</div>
+        <h1>Smart Laundromat</h1>
+        <p>ระบบซักผ้าอัจฉริยะ</p>
+    </div>
+
+    <div th:if="${param.error}" class="alert alert-error">
+        username หรือ password ไม่ถูกต้อง
+    </div>
+    <div th:if="${param.registered}" class="alert alert-success">
+        สมัครสมาชิกสำเร็จแล้ว กรุณาเข้าสู่ระบบ
+    </div>
+    <div th:if="${param.logout}" class="alert alert-success">
+        ออกจากระบบแล้ว
+    </div>
+
+    <form method="post" th:action="@{/login}">
+        <label>Username</label>
+        <input type="text" name="username"
+               placeholder="กรอก username" required autofocus/>
+
+        <label>Password</label>
+        <input type="password" name="password"
+               placeholder="กรอก password" required/>
+
+        <button type="submit" class="btn">เข้าสู่ระบบ</button>
+    </form>
+
+    <div class="divider">หรือ</div>
+
+    <a href="/register" class="link-btn">สมัครสมาชิกใหม่</a>
+
+</div>
+</body>
+</html>

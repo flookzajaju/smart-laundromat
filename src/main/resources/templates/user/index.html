@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Laundromat</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f0f2f5; }
+
+        .navbar {
+            background: #1D9E75; padding: 14px 24px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .navbar h1 { color: #fff; font-size: 17px; font-weight: 500; }
+        .navbar-right { display: flex; align-items: center; gap: 12px; }
+        .navbar span { color: rgba(255,255,255,0.85); font-size: 13px; }
+        .nav-btn {
+            color: #fff; background: rgba(255,255,255,0.18);
+            border: none; padding: 6px 14px;
+            border-radius: 8px; font-size: 13px; cursor: pointer;
+            text-decoration: none; display: inline-block;
+        }
+        .nav-btn:hover { background: rgba(255,255,255,0.28); }
+
+        .container { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+        .topbar {
+            background: #fff; border-radius: 12px;
+            border: 0.5px solid #e5e5e5;
+            padding: 14px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 20px;
+        }
+        .topbar p, .topbar span { font-size: 13px; color: #888; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+
+        .card {
+            background: #fff; border-radius: 12px;
+            border: 0.5px solid #e5e5e5; padding: 20px;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 12px;
+        }
+        .card h3 { font-size: 15px; font-weight: 500; color: #222; }
+
+        .badge {
+            font-size: 12px; font-weight: 500;
+            padding: 4px 14px; border-radius: 20px;
+            display: inline-flex; align-items: center; gap: 5px;
+        }
+        .badge-RUNNING { background: #FCEBEB; color: #A32D2D; }
+        .badge-IDLE    { background: #E1F5EE; color: #085041; }
+        .badge-DONE    { background: #E6F1FB; color: #0C447C; }
+        .badge-PAUSED  { background: #FAEEDA; color: #633806; }
+        .badge-WAITING { background: #f59e0b; color: white; }
+        .badge-ERROR   { background: #ef4444; color: white; }
+
+        .machine-visual { text-align: center; margin: 10px 0; padding: 10px; }
+        .wm-icon { width: 65px; height: 65px; color: #94a3b8; transition: 0.3s ease; }
+
+        @keyframes shake-machine {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-2px) rotate(-1deg); }
+            50% { transform: translateX(0); }
+            75% { transform: translateX(2px) rotate(1deg); }
+            100% { transform: translateX(0); }
+        }
+
+        .icon-RUNNING .wm-icon { color: #1D9E75; animation: shake-machine 0.2s infinite; }
+        .icon-PAUSED .wm-icon  { color: #f59e0b; }
+        .icon-WAITING .wm-icon { color: #f59e0b; animation: shake-machine 1.5s infinite; }
+        .icon-DONE .wm-icon    { color: #378ADD; }
+        .icon-ERROR .wm-icon   { color: #ef4444; }
+
+        .amp-box {
+            width: 100%; background: #f7f7f7;
+            border-radius: 8px; padding: 10px 14px;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .amp-box span { font-size: 13px; color: #888; }
+        .amp-val { font-size: 15px; font-weight: 500; color: #222; }
+        .amp-bar {
+            flex: 1; height: 6px; background: #e5e5e5;
+            border-radius: 3px; overflow: hidden;
+        }
+        .amp-fill {
+            height: 100%; background: #1D9E75;
+            border-radius: 3px; transition: width 0.4s;
+        }
+
+        .timer-box {
+            width: 100%; background: #f7f7f7;
+            border-radius: 8px; padding: 10px 14px;
+        }
+        .timer-row {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 4px;
+        }
+        .timer-row:last-child { margin-bottom: 0; }
+        .timer-label { font-size: 12px; color: #888; }
+        .timer-value { font-size: 15px; font-weight: 500; color: #222; }
+        .timer-remain { font-size: 13px; font-weight: 500; color: #1D9E75; }
+        .timer-paused {
+            margin-top: 6px; font-size: 11px;
+            color: #BA7517; text-align: center;
+            padding: 3px 8px; background: #FAEEDA;
+            border-radius: 6px;
+        }
+        .timer-no-data { font-size: 12px; color: #aaa; text-align: right; }
+
+        .card-btns { width: 100%; display: flex; flex-direction: column; gap: 8px; }
+        .btn-outline {
+            width: 100%; padding: 9px;
+            border: 0.5px solid #ddd; background: #fff;
+            color: #333; border-radius: 8px;
+            font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        .btn-outline:hover { background: #f7f7f7; }
+        .btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+        .btn-green {
+            width: 100%; padding: 9px;
+            border: none; background: #1D9E75; color: #fff;
+            border-radius: 8px; font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            font-weight: 500;
+        }
+        .btn-green:hover { background: #0F6E56; }
+        .btn-green:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-green-done {
+            width: 100%; padding: 9px;
+            border: none; background: #378ADD; color: #fff;
+            border-radius: 8px; font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            font-weight: 500;
+        }
+        .btn-green-done:hover { background: #185FA5; }
+
+        .contact-bar {
+            background: #fff; border-radius: 12px;
+            border: 0.5px solid #e5e5e5; padding: 16px 20px;
+            display: flex; justify-content: space-between;
+            align-items: center; flex-wrap: wrap; gap: 12px;
+        }
+        .contact-bar p { font-size: 14px; font-weight: 500; color: #222; }
+        .contact-items { display: flex; gap: 20px; flex-wrap: wrap; }
+        .contact-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #888; }
+        .contact-item a { color: #1D9E75; text-decoration: none; font-weight: 500; }
+        .contact-item a:hover { text-decoration: underline; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+            display: flex; align-items: center; justify-content: center; z-index: 100;
+        }
+        .modal {
+            background: #fff; border-radius: 16px;
+            padding: 24px; width: 90%; max-width: 580px;
+            border: 0.5px solid #e5e5e5;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-header h3 { font-size: 16px; font-weight: 500; }
+        .modal-close { background: none; border: none; cursor: pointer; color: #888; font-size: 22px; line-height: 1; }
+        .modal-stats { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .stat-box { flex: 1; background: #f7f7f7; border-radius: 8px; padding: 10px 14px; text-align: center; min-width: 90px; }
+        .stat-box p { font-size: 12px; color: #888; margin-bottom: 4px; }
+        .stat-box span { font-size: 18px; font-weight: 500; }
+        .hidden { display: none !important; }
+
+        .toast {
+            position: fixed; bottom: 24px; right: 24px;
+            background: #1D9E75; color: #fff;
+            padding: 10px 20px; border-radius: 8px;
+            font-size: 13px; z-index: 200;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+        }
+
+        /* 🟢 CSS สำหรับ ป๊อปอัป QR Code */
+        .modal-qr {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(3px);
+        }
+        .modal-qr-content {
+            background-color: #fff;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 16px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+            position: relative;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            animation: scaleIn 0.3s ease-out;
+        }
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+        .close-qr-btn {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            font-size: 28px;
+            cursor: pointer;
+            color: #aaa;
+            transition: 0.2s;
+        }
+        .close-qr-btn:hover {
+            color: #e11d48;
+        }
+        .qr-image {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto;
+            display: block;
+            border: 2px dashed #ccc;
+            padding: 10px;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <h1>🧺 Smart Laundromat</h1>
+    <div class="navbar-right">
+        <span th:text="'สวัสดี, ' + ${username}">สวัสดี, user</span>
+        <a class="nav-btn" th:href="@{/logout}">ออกจากระบบ</a>
+    </div>
+</nav>
+
+<div class="container">
+
+    <div class="topbar">
+        <p>🔄 ข้อมูลอัปเดตเรียลไทม์ทุก 5 วินาที</p>
+        <span>🕐 อัปเดตล่าสุด: <span id="last-time">--</span></span>
+    </div>
+
+    <div class="grid" id="machine-grid">
+        <div style="grid-column:1/-1; text-align:center; padding:2rem; color:#aaa; font-size:14px;">
+            กำลังโหลด...
+        </div>
+    </div>
+
+    <div class="contact-bar">
+        <p>📞 ติดต่อแอดมิน</p>
+        <div class="contact-items">
+            <div class="contact-item">
+                <span onclick="showLineQrModal()" style="cursor: pointer; background: #00B900; color: white; padding: 2px 8px; border-radius: 6px; font-size: 12px; margin-right: 8px;">
+                    📱 error bot
+                </span>
+                <span style="color:#1D9E75; font-size:16px;">💬</span>
+                LINE ID: <a href="https://line.me/ti/p/~@peeraphat" target="_blank">@peeraphat</a>
+            </div>
+            <div class="contact-item">
+                <span style="font-size:16px;">📱</span>
+                โทร: <a href="tel:0984216621">098 421 6621</a>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="modal-overlay hidden" id="chart-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modal-title">กราฟการสั่นสะเทือน</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-stats">
+            <div class="stat-box"><p>ค่าปัจจุบัน</p><span id="modal-current" style="color:#1D9E75;">-- g</span></div>
+            <div class="stat-box"><p>ค่าสูงสุด</p><span id="modal-max" style="color:#D85A30;">-- g</span></div>
+            <div class="stat-box"><p>RMS</p><span id="modal-rms" style="color:#534AB7;">-- g</span></div>
+            <div class="stat-box"><p>สถานะ</p><span id="modal-status" style="font-size:13px;">--</span></div>
+        </div>
+        <div style="position:relative; height:220px; margin-bottom:8px;">
+            <canvas id="modalChart" role="img" aria-label="กราฟการสั่นสะเทือน realtime"></canvas>
+        </div>
+        <p style="font-size:11px; color:#aaa; text-align:center;">
+            แกน Y = ความแรงการสั่น (g) — อัปเดตทุก 2 วินาที
+        </p>
+    </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<div id="lineQrModal" class="modal-qr">
+    <div class="modal-qr-content">
+        <span class="close-qr-btn" onclick="closeLineQrModal()">&times;</span>
+        <h3 style="color: #00B900; margin-bottom: 10px;">📱 สำหรับผู้ที่ยังไม่ได้เชื่อมกับline bot</h3>
+        <p style="font-size: 14px; color: #555; margin-bottom: 20px;">
+          กรุณาสแกน QR Code ด้านล่างนี้
+        </p>
+        <img src="/image_4d6083.png" alt="Admin LINE QR Code" class="qr-image">
+    </div>
+</div>
+
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+<script>
+    let machines       = [];
+    let modalChart     = null;
+    let modalMachineId = null;
+    let modalInterval  = null;
+    let chartMax       = 0;
+    const chartLabels  = [];
+    const chartData    = [];
+    let currentUserId  = null;
+
+    const STATUS_LABEL = {
+        RUNNING: '🔴 กำลังซัก',
+        IDLE:    '✅ ว่างพร้อมใช้',
+        DONE:    '🔵 ซักเสร็จแล้ว',
+        PAUSED:  '🟡 หยุดชั่วคราว',
+        WAITING: '🟠 เปิดฝากลางคัน',
+        ERROR:   '❌ เซ็นเซอร์ขัดข้อง'
+    };
+
+    const STATUS_CLASS = {
+        RUNNING: 'badge-RUNNING',
+        IDLE:    'badge-IDLE',
+        DONE:    'badge-DONE',
+        PAUSED:  'badge-PAUSED',
+        WAITING: 'badge-WAITING',
+        ERROR:   'badge-ERROR'
+    };
+
+    async function initializeLiff() {
+        try {
+            await liff.init({ liffId: "2010489918-x50rkkzz" });
+            if (liff.isLoggedIn()) {
+                const profile = await liff.getProfile();
+                currentUserId = profile.userId;
+            }
+            // 🟢 เอาบล็อก else ที่สั่งออโต้ login ออก เพื่อไม่ให้เกิดลูปเด้งไม่รู้จบ
+        } catch (err) {
+            console.error('LIFF Init Error:', err);
+            showToast('⚠️ ไม่สามารถเชื่อมต่อระบบ LINE ได้');
+        }
+    }
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.remove('hidden');
+        setTimeout(() => t.classList.add('hidden'), 3000);
+    }
+
+    function formatTime(seconds) {
+        if (seconds == null || seconds < 0) return '--:--';
+        const h = Math.floor(seconds / 3600), m = Math.floor((seconds % 3600) / 60), s = Math.floor(seconds % 60);
+        if (h > 0) return h + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+        return String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    }
+
+    async function loadMachines() {
+        try {
+            const res = await fetch('/api/machines');
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            machines = await res.json();
+            renderGrid();
+            document.getElementById('last-time').textContent = new Date().toLocaleTimeString('th-TH');
+        } catch(e) {
+            if (machines.length === 0) {
+                document.getElementById('machine-grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#aaa;font-size:14px;">ไม่สามารถโหลดข้อมูลได้</div>';
+            }
+        }
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('machine-grid');
+        if (!machines.length) {
+            grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:2rem;color:#aaa;font-size:14px;">ยังไม่มีเครื่องในระบบ</div>';
+            return;
+        }
+
+        grid.innerHTML = machines.map(m => {
+            const st     = m.status || 'IDLE';
+            const amp    = m.amplitude || 0;
+            const ampPct = Math.min(amp * 300, 100).toFixed(0);
+            const num    = m.machineNumber || '-';
+            const isRunning = st === 'RUNNING' || st === 'PAUSED';
+            const isIdle    = st === 'IDLE';
+            const isDone    = st === 'DONE';
+
+            let timerBlock = '';
+            if (isRunning && m.elapsedSeconds != null) {
+                const elapsed = formatTime(m.elapsedSeconds);
+                timerBlock = `
+                <div class="timer-box">
+                    <div class="timer-row">
+                        <span class="timer-label">⏱ ซักมาแล้ว</span>
+                        <span class="timer-value">${elapsed}</span>
+                    </div>
+                    ${m.estimatedRemainSeconds != null ? `
+                    <div class="timer-row">
+                        <span class="timer-label">🏁 คาดว่าเสร็จใน</span>
+                        <span class="timer-remain">${formatTime(m.estimatedRemainSeconds)}</span>
+                    </div>` : `
+                    <div class="timer-row">
+                        <span class="timer-label">🏁 คาดว่าเสร็จใน</span>
+                        <span class="timer-no-data">ยังไม่มีข้อมูล</span>
+                    </div>`}
+                    ${st === 'PAUSED' ? `<div class="timer-paused">🟡 หยุดชั่วคราว — เวลายังนับต่อ</div>` : ''}
+                </div>`;
+            }
+
+            let notifyBtn = '';
+            if (isIdle) {
+                notifyBtn = `<button class="btn-green" disabled>✅ ตู้ว่างพร้อมใช้</button>`;
+            } else if (isDone) {
+                notifyBtn = `<button class="btn-green-done" onclick="subscribeNotify('${m.id}','${num}',this)">🔔 แจ้งเตือน (ซักเสร็จแล้ว รอหยิบผ้า)</button>`;
+            } else if (isRunning) {
+                notifyBtn = `<button class="btn-green" onclick="subscribeNotify('${m.id}','${num}',this)">🔔 กดรับแจ้งเตือนเมื่อว่างหรือเสร็จ</button>`;
+            } else {
+                notifyBtn = `<button class="btn-outline" disabled>🔕 เครื่องขัดข้อง / งดให้บริการ</button>`;
+            }
+
+            return `
+            <div class="card">
+                <h3>เครื่องที่ ${num.replace('WM-','') || '?'} (${num})</h3>
+                <span class="badge ${STATUS_CLASS[st] || ''}">
+                    ${STATUS_LABEL[st] || st}
+                </span>
+
+                <div class="machine-visual icon-${st}">
+                    <svg class="wm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect>
+                        <line x1="4" y1="6" x2="20" y2="6"></line>
+                        <circle cx="12" cy="14" r="4"></circle>
+                        <path d="M12 14c-1.5 0-2.5-1-2.5-2.5"></path>
+                    </svg>
+                </div>
+
+                <div class="amp-box">
+                    <span>〰️ ค่าสั่น:</span>
+                    <span class="amp-val">${amp.toFixed(3)} g</span>
+                    <div class="amp-bar">
+                        <div class="amp-fill" style="width:${ampPct}%"></div>
+                    </div>
+                </div>
+                ${timerBlock}
+                <div class="card-btns">
+                    <button class="btn-outline" onclick="openModal('${m.id}','${num}')">📈 ดูกราฟการสั่น</button>
+                    ${notifyBtn}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    async function subscribeNotify(machineId, machineNumber, btn) {
+        // 🟢 ถ้ายังไม่ได้ล็อกอิน LINE ให้สั่งล็อกอิน ณ วินาทีที่กดปุ่มนี้แทน
+        if (!liff.isLoggedIn()) {
+            showToast('🔒 กำลังนำคุณไปเข้าสู่ระบบ LINEเพื่อรับแจ้งเตือน...');
+            setTimeout(() => {
+                liff.login({ redirectUri: window.location.href });
+            }, 1200);
+            return;
+        }
+
+        // ถ้าล็อกอินแล้ว แต่ตัวแปรยังไม่มีค่า ให้ดึงค่าใหม่อีกครั้งเพื่อความชัวร์
+        if (!currentUserId) {
+            try {
+                const profile = await liff.getProfile();
+                currentUserId = profile.userId;
+            } catch(err) {
+                showToast('⚠️ ไม่สามารถดึงข้อมูลบัญชี LINE ได้ กรุณาลองใหม่');
+                return;
+            }
+        }
+
+        btn.disabled = true; btn.textContent = 'กำลังดำเนินการ...';
+        try {
+            const res = await fetch('/api/notify/subscribe', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ machineId, machineNumber, userId: currentUserId })
+            });
+            if (res.ok) {
+                btn.textContent = '✅ รับแจ้งเตือนแล้ว'; btn.style.background = '#0F6E56';
+                showToast('✅ จะแจ้งเตือนเข้า LINE เมื่อเครื่อง ' + machineNumber + ' ว่าง');
+            } else throw new Error('HTTP ' + res.status);
+        } catch(e) {
+            showToast('❌ เกิดข้อผิดพลาด กรุณาลองใหม่');
+            btn.disabled = false; btn.textContent = '🔔 กดรับแจ้งเตือนเมื่อว่างหรือเสร็จ';
+        }
+    }
+
+    function openModal(machineId, machineNumber) {
+        modalMachineId = machineId; chartLabels.length = 0; chartData.length = 0; chartMax = 0;
+        document.getElementById('modal-title').textContent = 'กราฟการสั่นสะเทือน — ' + machineNumber;
+        document.getElementById('chart-modal').classList.remove('hidden');
+        document.getElementById('modal-current').textContent = '-- g'; document.getElementById('modal-max').textContent = '-- g';
+        document.getElementById('modal-rms').textContent = '-- g'; document.getElementById('modal-status').textContent = '--';
+        if (modalChart) { modalChart.destroy(); modalChart = null; }
+
+        const ctx = document.getElementById('modalChart').getContext('2d');
+        modalChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: chartLabels, datasets: [{ label: 'Dynamic vibration (g)', data: chartData, borderColor: '#378ADD', borderWidth: 1.5, pointRadius: 0, tension: 0.1, fill: false }] },
+            options: {
+                responsive: true, maintainAspectRatio: false, animation: {duration: 150}, plugins: { legend: { display: false } },
+                scales: {
+                    x: { display: true, ticks: { font: {size: 10}, color: '#aaa', maxTicksLimit: 6, maxRotation: 0 }, grid: {color: 'rgba(0,0,0,0.05)'} },
+                    y: { min: -0.4, max: 0.4, ticks: { font: {size: 11}, callback: v => v.toFixed(1) + ' g' }, grid: {color: 'rgba(0,0,0,0.06)'}, title: { display: true, text: 'Dynamic vibration acceleration (g)', font: {size: 10}, color: '#aaa' } }
+                }
+            }
+        });
+        updateModalChart();
+        modalInterval = setInterval(updateModalChart, 2000);
+    }
+
+    async function updateModalChart() {
+        try {
+            const m = machines.find(x => x.id === modalMachineId);
+            if (!m) return;
+            const bufRes = await fetch('/api/sensor/buffer/' + m.machineNumber);
+            const bufData = await bufRes.json();
+            const rawData = bufData.data || [];
+
+            if (rawData.length > 0) {
+                const now = new Date().toLocaleTimeString('th-TH');
+                const latestVal = rawData[rawData.length - 1];
+                if (chartLabels.length >= 60) { chartLabels.shift(); chartData.shift(); }
+                chartLabels.push(now); chartData.push(parseFloat(latestVal.toFixed(4)));
+
+                const absMax = Math.max(...chartData.map(Math.abs));
+                if (absMax > chartMax) chartMax = absMax;
+                const rms = Math.sqrt(chartData.reduce((s,v) => s + v*v, 0) / chartData.length);
+                const yRange = Math.max(Math.ceil(absMax * 10) / 10 + 0.05, 0.15);
+                modalChart.options.scales.y.min = -yRange; modalChart.options.scales.y.max = yRange;
+
+                modalChart.data.labels = [...chartLabels]; modalChart.data.datasets[0].data = [...chartData];
+                modalChart.update('none');
+
+                document.getElementById('modal-current').textContent = latestVal.toFixed(4) + ' g';
+                document.getElementById('modal-max').textContent = chartMax.toFixed(4) + ' g';
+                document.getElementById('modal-rms').textContent = rms.toFixed(4) + ' g';
+            }
+
+            const freshMachine = machines.find(x => x.id === modalMachineId);
+            if (freshMachine) {
+                document.getElementById('modal-status').textContent = STATUS_LABEL[freshMachine.status] || freshMachine.status || '--';
+            }
+        } catch(e) { console.error('อัปเดตกราฟผิดพลาด:', e); }
+    }
+
+    function closeModal() {
+        document.getElementById('chart-modal').classList.add('hidden');
+        if (modalInterval) { clearInterval(modalInterval); modalInterval = null; }
+        if (modalChart) { modalChart.destroy(); modalChart = null; }
+    }
+
+    document.getElementById('chart-modal').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
+
+    initializeLiff();
+    loadMachines();
+    setInterval(loadMachines, 5000);
+</script>
+
+<script>
+    // 🟢 โค้ด JavaScript สำหรับควบคุมป๊อปอัป QR Code
+    function showLineQrModal() {
+        document.getElementById('lineQrModal').style.display = 'block';
+    }
+
+    function closeLineQrModal() {
+        document.getElementById('lineQrModal').style.display = 'none';
+    }
+
+    // ปิดอัตโนมัติเมื่อคลิกพื้นที่ว่างนอกกล่อง
+    window.onclick = function(event) {
+        let modalQr = document.getElementById('lineQrModal');
+        let modalChart = document.getElementById('chart-modal');
+        if (event.target == modalQr) {
+            closeLineQrModal();
+        }
+        if (event.target == modalChart) {
+            closeModal();
+        }
+    }
+</script>
+</body>
+</html>

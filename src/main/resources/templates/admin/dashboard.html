@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: sans-serif; background: #f5f5f5; }
+        .navbar { background: #0F6E56; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .navbar h1 { font-size: 18px; font-weight: 500; }
+        .navbar a { color: white; text-decoration: none; font-size: 14px; background: rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 8px; }
+        .container { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; border-radius: 12px; padding: 1.25rem; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .stat-card .number { font-size: 28px; font-weight: 500; color: #1D9E75; margin-bottom: 4px; }
+        .stat-card .label { font-size: 13px; color: #888; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+        .card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .card h3 { font-size: 15px; font-weight: 500; margin-bottom: 1rem; color: #333; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; }
+        .machine-list { display: flex; flex-direction: column; gap: 10px; }
+        .machine-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f9f9f9; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .dot-IDLE { background: #ccc; }
+        .dot-RUNNING { background: #1D9E75; }
+        .dot-DONE { background: #378ADD; }
+        .dot-PAUSED { background: #BA7517; }
+        .btn-history { background: #e0f2fe; color: #0284c7; border: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .btn-history:hover { background: #bae6fd; }
+
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 25px; border-radius: 16px; width: 85%; max-width: 900px; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .close-btn { position: absolute; right: 25px; top: 20px; font-size: 28px; cursor: pointer; color: #888; transition: 0.3s; }
+        .close-btn:hover { color: #e11d48; }
+
+        .history-controls { display: flex; gap: 15px; margin-bottom: 20px; padding: 15px; background: #f8fafc; border-radius: 10px; align-items: flex-end; border: 1px solid #e2e8f0; }
+        .history-controls select { padding: 8px 12px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; background: white; cursor: pointer; }
+        .history-stats { display: flex; gap: 30px; margin-bottom: 20px; padding: 10px; border-left: 4px solid #1D9E75; background: #f0fdf4; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <h1>⚙️ Admin Dashboard</h1>
+    <div><a href="/user/index">หน้า user</a> <a href="/logout">ออกจากระบบ</a></div>
+</nav>
+
+<div class="container">
+    <div class="stats">
+        <div class="stat-card"><div class="number" id="stat-total">-</div><div class="label">เครื่องทั้งหมด</div></div>
+        <div class="stat-card"><div class="number" id="stat-running" style="color:#1D9E75">-</div><div class="label">กำลังซัก</div></div>
+        <div class="stat-card"><div class="number" id="stat-idle" style="color:#888">-</div><div class="label">ว่างอยู่</div></div>
+        <div class="stat-card"><div class="number" id="stat-users" th:text="${totalUsers != null ? totalUsers : '-'}" style="color:#534AB7">-</div><div class="label">ผู้ใช้ทั้งหมด</div></div>
+    </div>
+
+    <div class="grid-2">
+        <div class="card">
+            <h3>📈 กราฟการสั่นสะเทือน Realtime</h3>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <select id="machine-select" onchange="changeMachine()" style="flex-grow: 1; padding: 8px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer;">
+                    <option value="">เลือกเครื่อง</option>
+                </select>
+                <select id="realtimeStyle" onchange="applyStyle('realtime')" style="padding: 8px; border-radius: 6px; border: 1px solid #1D9E75; background: #f0fdf4; color: #0F6E56; font-weight: bold; cursor: pointer;">
+                    <option value="classic">📊 กราฟamp</option>
+                    <option value="modern">🌊 กราฟax</option>
+                </select>
+            </div>
+
+            <canvas id="amplitudeChart" height="220"></canvas>
+        </div>
+        <div class="card">
+            <h3>🧺 สถานะเครื่องทั้งหมด</h3>
+            <div class="machine-list" id="machine-list">กำลังโหลด...</div>
+        </div>
+    </div>
+
+    <div class="grid-2">
+        <div class="card"><h3>📊 รอบซักรายวัน (7 วัน)</h3><canvas id="cycleChart" height="200"></canvas></div>
+        <div class="card"><h3>⏱ เวลาเฉลี่ยต่อรอบ (นาที)</h3><canvas id="avgChart" height="200"></canvas></div>
+    </div>
+</div>
+
+<div id="historyModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h3 id="modalTitle" style="margin-bottom: 15px; color: #0F6E56;">📊 ประวัติการซักย้อนหลัง</h3>
+
+        <div class="history-controls">
+            <div>
+                <label style="font-size: 12px; color: #64748b;">เลือกวันที่:</label><br>
+                <select id="historyDate" onchange="loadCyclesForDate()"></select>
+            </div>
+            <div style="flex-grow: 1;">
+                <label style="font-size: 12px; color: #64748b;">เลือกรอบการซัก:</label><br>
+                <select id="historyCycle" onchange="renderSelectedCycle()" style="width: 100%;"></select>
+            </div>
+            <div>
+                <label style="font-size: 12px; color: #64748b;">รูปแบบกราฟ:</label><br>
+                <select id="historyStyle" onchange="applyStyle('history')" style="border: 1px solid #378ADD; background: #eff6ff; color: #1e3a8a; font-weight: bold;">
+                    <option value="modern">🌊 กราฟax</option>
+                    <option value="classic">📊 กราฟamp</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="history-stats">
+            <span id="hist-rms"><strong>RMS เฉลี่ย:</strong> -</span>
+            <span id="hist-duration"><strong>เวลาซักจริง:</strong> - นาที</span>
+            <span id="hist-max"><strong>สั่นสูงสุด:</strong> - g</span>
+        </div>
+        <canvas id="historyChart" height="100"></canvas>
+    </div>
+</div>
+
+<script>
+    // 🟢 ประกาศตัวแปรเก็บข้อมูลให้ครบ
+    let rawBufferData = [];  // ถังเก็บ Amplitude (ค่าบวกล้วน)
+    let waveBufferData = []; // ถังเก็บ ax (ค่าคลื่นบวกลบ)
+    let rawHistoryData = []; // ถังเก็บประวัติย้อนหลัง
+
+    // 1. กำหนดค่าเริ่มต้นของกราฟทั้งหมด
+    const ampChart = new Chart(document.getElementById('amplitudeChart').getContext('2d'), {
+        type: 'line',
+        data: { labels: [], datasets: [{ label: 'Vibration (g)', data: [], borderColor: '#1D9E75', borderWidth: 2, pointRadius: 0, tension: 0.1, fill: false }] },
+        // 🟢 แก้ไข: ตั้งเพดานกราฟ Realtime เป็น 0.2
+        options: { responsive: true, animation: false, scales: { x: { grid: { display: true } }, y: { min: 0, suggestedMax: 0.2 } } }
+    });
+
+    const cycleChart = new Chart(document.getElementById('cycleChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [{ label: 'จำนวนรอบ', data: [], backgroundColor: '#378ADD' }] } });
+    const avgChart = new Chart(document.getElementById('avgChart').getContext('2d'), { type: 'bar', data: { labels: [], datasets: [{ label: 'นาที', data: [], backgroundColor: '#BA7517' }] } });
+
+    let histGradient = document.getElementById('historyChart').getContext('2d').createLinearGradient(0, 0, 0, 150);
+    histGradient.addColorStop(0, 'rgba(31, 119, 180, 0.4)');
+    histGradient.addColorStop(1, 'rgba(31, 119, 180, 0.0)');
+
+    const histChart = new Chart(document.getElementById('historyChart').getContext('2d'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Vibration (g)',
+                data: [],
+                borderColor: '#1f77b4',
+                borderWidth: 2,
+                fill: true,
+                backgroundColor: histGradient,
+                pointRadius: 0,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            animation: false,
+            scales: {
+                x: { grid: { display: false }, title: { display: true, text: 'เวลา (วินาที)' } },
+                // 🟢 แก้ไข: ตั้งกรอบกราฟประวัติเป็น -0.2 ถึง 0.2
+                y: { min: -0.2, suggestedMax: 0.2, title: { display: true, text: 'ความแรงการสั่น (g)' } }
+            }
+        }
+    });
+
+    // 🟢 ระบบสลับรูปแบบกราฟ (Classic vs Modern)
+    function applyStyle(type) {
+        if (type === 'realtime') {
+            const style = document.getElementById('realtimeStyle').value;
+            const ctx = ampChart.canvas.getContext('2d');
+
+            if (style === 'modern') {
+                let grad = ctx.createLinearGradient(0, 0, 0, 220);
+                grad.addColorStop(0, 'rgba(29, 158, 117, 0.4)');
+                grad.addColorStop(1, 'rgba(29, 158, 117, 0.0)');
+
+                ampChart.data.datasets[0].tension = 0.4;
+                ampChart.data.datasets[0].fill = true;
+                ampChart.data.datasets[0].backgroundColor = grad;
+                ampChart.data.datasets[0].pointRadius = 0;
+                ampChart.options.scales.x.grid.display = false;
+            } else {
+                ampChart.data.datasets[0].tension = 0.1;
+                ampChart.data.datasets[0].fill = false;
+                ampChart.data.datasets[0].backgroundColor = 'transparent';
+                ampChart.data.datasets[0].pointRadius = 0;
+                ampChart.options.scales.x.grid.display = true;
+            }
+            updateRealtimeChartDisplay();
+
+        } else if (type === 'history') {
+            const style = document.getElementById('historyStyle').value;
+            const ctx = histChart.canvas.getContext('2d');
+
+            if (style === 'modern') {
+                let grad = ctx.createLinearGradient(0, 0, 0, 150);
+                grad.addColorStop(0, 'rgba(31, 119, 180, 0.4)');
+                grad.addColorStop(1, 'rgba(31, 119, 180, 0.0)');
+
+                histChart.data.datasets[0].tension = 0.4;
+                histChart.data.datasets[0].fill = true;
+                histChart.data.datasets[0].backgroundColor = grad;
+                histChart.data.datasets[0].pointRadius = 0;
+                histChart.options.scales.x.grid.display = false;
+            } else {
+                histChart.data.datasets[0].tension = 0;
+                histChart.data.datasets[0].fill = false;
+                histChart.data.datasets[0].backgroundColor = 'transparent';
+                histChart.data.datasets[0].pointRadius = 2;
+                histChart.options.scales.x.grid.display = true;
+            }
+            updateHistoryChartDisplay();
+        }
+    }
+
+    let selectedMachineNum = '';
+    let currentHistoryMachine = '';
+    let currentDayCycles = [];
+
+    function changeMachine() {
+        selectedMachineNum = document.getElementById('machine-select').value;
+    }
+
+    function statusLabel(s) { return { IDLE:'ว่าง', RUNNING:'กำลังซัก', DONE:'ซักเสร็จ', PAUSED:'พักเครื่อง' }[s] || s; }
+
+    // 2. ดึงข้อมูลสถิติ
+    async function loadStats() {
+        try {
+            const res = await fetch('/api/stats/cycles');
+            if(res.ok) {
+                const data = await res.json();
+                cycleChart.data.labels = data.map(d => d.date);
+                cycleChart.data.datasets[0].data = data.map(d => d.count);
+                cycleChart.update();
+                avgChart.data.labels = data.map(d => d.date);
+                avgChart.data.datasets[0].data = data.map(d => d.avgMinutes);
+                avgChart.update();
+            }
+        } catch(e) { console.log('Stats API not ready yet'); }
+    }
+
+    // 3. ดึงสถานะเครื่องทั้งหมด
+    async function loadMachines() {
+        try {
+            const res = await fetch('/api/machines');
+            const machines = await res.json();
+
+            document.getElementById('stat-total').textContent = machines.length;
+            document.getElementById('stat-running').textContent = machines.filter(m => m.status === 'RUNNING' || m.status === 'PAUSED').length;
+            document.getElementById('stat-idle').textContent = machines.filter(m => m.status === 'IDLE').length;
+
+            if (document.getElementById('machine-select').options.length <= 1) {
+                document.getElementById('machine-select').innerHTML = '<option value="">เลือกเครื่อง</option>' +
+                    machines.map(m => `<option value="${m.machineNumber}">เครื่อง ${m.machineNumber}</option>`).join('');
+            }
+
+            document.getElementById('machine-list').innerHTML = machines.map(m => `
+                <div class="machine-row">
+                    <div>
+                        <span class="status-dot dot-${m.status}"></span>
+                        <strong>เครื่อง ${m.machineNumber}</strong> | ${statusLabel(m.status)}
+                    </div>
+                    <div>
+                        <span style="margin-right:10px; font-size:12px; color:#666;">Amp: ${(m.amplitude || 0).toFixed(3)}g</span>
+                        <button class="btn-history" onclick="openHistory('${m.machineNumber}')">📊 ดูกราฟประวัติ</button>
+                    </div>
+                </div>`).join('');
+        } catch(e) { console.error(e); }
+    }
+
+    // 4. ดึงข้อมูลกราฟ Realtime (รองรับระบบ 2 ถัง)
+    async function loadRealtimeGraph() {
+        if (!selectedMachineNum) return;
+        try {
+            const res = await fetch('/api/sensor/buffer/' + selectedMachineNum);
+            if(res.ok) {
+                const bufferInfo = await res.json();
+                rawBufferData = bufferInfo.data || [];  // ดึงถัง Amp
+                waveBufferData = bufferInfo.wave || []; // ดึงถัง ax
+                updateRealtimeChartDisplay();
+            }
+        } catch(e) { console.error(e); }
+    }
+
+    // 🟢 ฟังก์ชันอัปเดตกราฟ Realtime (ถูกแก้สเกลให้แคบลง)
+    function updateRealtimeChartDisplay() {
+        if (rawBufferData.length === 0) return;
+
+        const style = document.getElementById('realtimeStyle').value;
+        let plotData = [];
+
+        if (style === 'classic') {
+            plotData = rawBufferData;
+            ampChart.options.scales.y.min = 0;
+            ampChart.options.scales.y.suggestedMax = 0.2;
+        } else {
+            plotData = waveBufferData.length > 0 ? waveBufferData : rawBufferData;
+            ampChart.options.scales.y.min = -0.2;
+            ampChart.options.scales.y.suggestedMax = 0.2;
+        }
+
+        ampChart.data.labels = Array.from({length: plotData.length}, (_, i) => i);
+        ampChart.data.datasets[0].data = plotData;
+        ampChart.update('none');
+    }
+
+    // 5. ระบบดูกราฟประวัติ
+    async function openHistory(machineNumber) {
+        currentHistoryMachine = machineNumber;
+        document.getElementById('historyModal').style.display = 'block';
+        document.getElementById('modalTitle').textContent = `ประวัติการซักเครื่อง ${machineNumber}`;
+
+        const dateSelect = document.getElementById('historyDate');
+        if (dateSelect) {
+            dateSelect.innerHTML = '';
+            for(let i = 0; i < 7; i++) {
+                const d = new Date();
+                d.setDate(d.getDate() - i);
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                const dateStr = `${year}-${month}-${day}`;
+                const displayStr = i === 0 ? `วันนี้ (${dateStr})` : i === 1 ? `เมื่อวาน (${dateStr})` : dateStr;
+                dateSelect.innerHTML += `<option value="${dateStr}">${displayStr}</option>`;
+            }
+            loadCyclesForDate();
+        }
+    }
+
+    async function loadCyclesForDate() {
+        const dateStr = document.getElementById('historyDate').value;
+        const cycleSelect = document.getElementById('historyCycle');
+        cycleSelect.innerHTML = '<option value="">กำลังโหลด...</option>';
+        clearHistoryChart();
+
+        try {
+            const res = await fetch(`/api/sensor/history/${currentHistoryMachine}/date/${dateStr}`);
+            if(res.ok) {
+                currentDayCycles = await res.json();
+                if(currentDayCycles.length === 0) {
+                    cycleSelect.innerHTML = '<option value="">ไม่มีประวัติการซักในวันนี้</option>';
+                    return;
+                }
+                currentDayCycles.reverse();
+                cycleSelect.innerHTML = currentDayCycles.map((cycle, index) => {
+                    const time = new Date(cycle.startTime).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'});
+                    const roundNum = currentDayCycles.length - index;
+                    return `<option value="${index}">รอบที่ ${roundNum} (เวลา ${time} | ซัก ${cycle.activeDurationMinutes || 0} นาที)</option>`;
+                }).join('');
+                renderSelectedCycle();
+            }
+        } catch(e) { cycleSelect.innerHTML = '<option value="">เกิดข้อผิดพลาดในการโหลดข้อมูล</option>'; }
+    }
+
+    function renderSelectedCycle() {
+        const cycleIndex = document.getElementById('historyCycle').value;
+
+        if (cycleIndex === '' || currentDayCycles.length === 0) {
+            clearHistoryChart();
+            return;
+        }
+
+        const cycle = currentDayCycles[cycleIndex];
+
+        document.getElementById('hist-rms').innerHTML = `<strong>RMS เฉลี่ย:</strong> ${(cycle.rmsValue || 0).toFixed(4)} g`;
+        document.getElementById('hist-duration').innerHTML = `<strong>ซักจริง:</strong> ${cycle.activeDurationMinutes || 0} นาที`;
+        document.getElementById('hist-max').innerHTML = `<strong>สั่นสูงสุด:</strong> ${(cycle.maxAmplitude || 0).toFixed(3)} g`;
+
+        const style = document.getElementById('historyStyle').value;
+
+        if (style === 'modern') {
+            rawHistoryData = (cycle.axHistory && cycle.axHistory.length > 0)
+                ? cycle.axHistory
+                : (cycle.vibrationHistory || []);
+        } else {
+            rawHistoryData = cycle.vibrationHistory || [];
+        }
+
+        updateHistoryChartDisplay();
+    }
+
+    // 🟢 ฟังก์ชันอัปเดตกราฟประวัติ (ปรับสเกลอัตโนมัติตามข้อมูลจริงของแต่ละรอบ)
+    function updateHistoryChartDisplay() {
+        if (rawHistoryData.length === 0) {
+            histChart.data.labels = [];
+            histChart.data.datasets[0].data = [];
+            histChart.update();
+            return;
+        }
+
+        const style = document.getElementById('historyStyle').value;
+        let plotData = [];
+
+        // 1. สแกนหาจุดที่พุ่งสูงสุดและต่ำสุดของรอบนี้
+        let maxVal = Math.max(...rawHistoryData);
+        let minVal = Math.min(...rawHistoryData);
+
+        if (style === 'classic') {
+            // กราฟดั้งเดิม: แปลงเป็นค่าบวกทั้งหมด
+            plotData = rawHistoryData.map(val => Math.abs(val));
+            let absMax = Math.max(...plotData);
+
+            // สร้างเพดานกราฟ เผื่อพื้นที่ด้านบนไว้ 10% (ถ้าค่าน้อยกว่า 0.1 ให้ขั้นต่ำคือ 0.1 กราฟจะได้ไม่ซูมจนเละ)
+            let upperBound = absMax < 0.1 ? 0.1 : absMax * 1.1;
+
+            histChart.options.scales.y.min = 0;
+            histChart.options.scales.y.max = upperBound;
+            delete histChart.options.scales.y.suggestedMax; // เคลียร์ค่าเก่าทิ้ง
+
+        } else {
+            // กราฟสมูท: คลื่นมีทั้งบวกและลบ
+            plotData = rawHistoryData;
+
+            // หาค่าที่ฉีกออกไปไกลที่สุด (ไม่ว่าจะเป็นฝั่งบวกหรือลบ) เพื่อให้แกน 0 อยู่ตรงกลางจอเสมอ
+            let absMax = Math.max(Math.abs(maxVal), Math.abs(minVal));
+            let bound = absMax < 0.1 ? 0.1 : absMax * 1.1;
+
+            histChart.options.scales.y.min = -bound;
+            histChart.options.scales.y.max = bound;
+            delete histChart.options.scales.y.suggestedMax; // เคลียร์ค่าเก่าทิ้ง
+        }
+
+        histChart.data.labels = Array.from({length: rawHistoryData.length}, (_, i) => i);
+        histChart.data.datasets[0].data = plotData;
+        histChart.update('none');
+    }
+
+    function clearHistoryChart() {
+        document.getElementById('hist-rms').innerHTML = `<strong>RMS เฉลี่ย:</strong> -`;
+        document.getElementById('hist-duration').innerHTML = `<strong>ซักจริง:</strong> - นาที`;
+        document.getElementById('hist-max').innerHTML = `<strong>สั่นสูงสุด:</strong> - g`;
+        rawHistoryData = [];
+        updateHistoryChartDisplay();
+    }
+
+    function closeModal() { document.getElementById('historyModal').style.display = 'none'; }
+    window.onclick = function(event) { if (event.target == document.getElementById('historyModal')) closeModal(); }
+
+    loadStats();
+    loadMachines();
+
+    setInterval(loadMachines, 2000);
+    setInterval(loadRealtimeGraph, 500);
+</script>
+</body>
+</html>
