@@ -1,77 +1,69 @@
-# Smart Laundromat — IoT Firmware
+Smart Laundromat — Backend API
 
-ESP32 firmware for the Smart Laundromat monitoring system. This device attaches externally to a washing machine — no internal circuitry modification required — and streams vibration data used to detect machine availability.
+A real-time washing machine monitoring system that detects machine availability (Idle / Running / Done) using vibration sensor data, without modifying the internal circuitry of the washing machine.
 
-> Looking for the backend API and web dashboard? See [smart-laundromat](https://github.com/flookzajaju/smart-laundromat).
+This repository contains the backend service, built with Java and Spring Boot, which processes sensor data sent from the companion IoT device and exposes it through a REST API and web dashboard.
 
-## Overview
+Looking for the ESP32 firmware? See smart-laundromat-iot.
 
-This firmware runs on an ESP32 microcontroller connected to an MPU6050 accelerometer/gyroscope sensor. The sensor is mounted on the outside of a washing machine to pick up vibration patterns produced while it's running. Those readings are sent over the network to the [backend service](https://github.com/flookzajaju/smart-laundromat), which classifies the machine's state as Idle, Running, or Done.
+Overview
 
-## Hardware
+Many shared laundromats don't tell you whether a machine is actually free or how long you'll have to wait. This project solves that by attaching a low-cost vibration sensor (MPU6050) to the outside of existing washing machines, streaming that data to this backend, and classifying each machine's state in real time — no hardware modification required.
 
-| Component | Purpose |
-|---|---|
-| ESP32 | Microcontroller — reads sensor data and sends it to the backend |
-| MPU6050 | Accelerometer + gyroscope — captures vibration from the washing machine |
-| Reed Switch | Detects door open/close state (e.g. lid or door status) |
+Features
+Classifies each machine's state as Idle, Running, or Done based on incoming vibration data
+Estimates remaining cycle time from collected sensor patterns
+Stores vibration logs and historical wash cycles in MongoDB for monitoring and preventive maintenance analysis
+Exposes a RESTful API for the frontend dashboard and other clients
+Serves a responsive web dashboard so users can check machine availability, and admins can visualize historical vibration trends
+Tech Stack
+Layer	Technology
+Backend	Java, Spring Boot
+Database	MongoDB
+Frontend	HTML, CSS, JavaScript
+Build Tool	Maven
+Hardware (companion repo)	ESP32, MPU6050, Reed Switch
+Project Structure
+smart-laundromat/
+├── src/
+│   ├── main/
+│   │   ├── java/...      # Spring Boot application (controllers, services, models)
+│   │   └── resources/    # application config, static dashboard assets
+│   └── test/
+├── .mvn/wrapper/
+├── mvnw / mvnw.cmd
+└── pom.xml
+Getting Started
+Prerequisites
+Java 17+ (adjust to whatever version you targeted)
+Maven (or use the included mvnw wrapper)
+MongoDB instance (local or cloud, e.g. MongoDB Atlas)
+Setup
+bash
+# Clone the repository
+git clone https://github.com/flookzajaju/smart-laundromat.git
+cd smart-laundromat
 
-### Wiring
+# Configure your MongoDB connection in
+# src/main/resources/application.properties (or application.yml)
 
-| Component Pin | ESP32 Pin |
-|---|---|
-| MPU6050 VCC | 3.3V |
-| MPU6050 GND | GND |
-| MPU6050 SCL | GPIO 22 |
-| MPU6050 SDA | GPIO 21 |
-| Reed Switch | GPIO 12 |
+# Run with the Maven wrapper
+./mvnw spring-boot:run
 
-## Features
+The API will start on http://localhost:8080 by default.
 
-- Reads real-time vibration data from the MPU6050 via I2C
-- Detects door open/close state using a reed switch
-- Sends sensor readings to the backend REST API over Wi-Fi
-- Non-invasive setup — attaches externally, no modification to the washing machine's internal circuitry
-- Lightweight enough to run continuously for ongoing monitoring
+How It Works
+The ESP32 device (see the IoT repo) reads vibration data from the MPU6050 sensor attached to a washing machine.
+Sensor readings are sent to this backend's REST API.
+The backend classifies the current machine state (Idle / Running / Done) and estimates remaining cycle time.
+Each reading and state change is logged to MongoDB for historical analysis.
+The web dashboard queries the API to show live machine status and vibration trend history.
+Related Repository
+IoT Firmware: smart-laundromat-iot — ESP32 code for reading and transmitting sensor data
+Author
 
-## Getting Started
+Peeraphat Lampoothong GitHub: @flookzajaju
 
-### Prerequisites
-
-- ESP32 development board
-- MPU6050 sensor module
-- Arduino IDE or PlatformIO
-- Wi-Fi network credentials
-- The [backend service](https://github.com/flookzajaju/smart-laundromat) running and reachable on the network
-
-### Setup
-
-```bash
-git clone https://github.com/flookzajaju/smart-laundromat-iot.git
-```
-
-1. Open the project in Arduino IDE or PlatformIO.
-2. Update your Wi-Fi credentials and backend API endpoint in the config section of the code.
-3. Wire the MPU6050 to the ESP32 as described above.
-4. Flash the firmware to the ESP32.
-5. Power on the device — it will begin reading vibration data and sending it to the backend.
-
-## How It Works
-
-1. The ESP32 continuously reads accelerometer/gyroscope values from the MPU6050.
-2. The reed switch reports whether the washing machine door is open or closed.
-3. Readings are packaged and sent to the backend API at regular intervals.
-4. The backend interprets these vibration and door-state patterns to determine whether the machine is idle, running, or finished.
-
-## Related Repository
-
-- **Backend & Dashboard:** [smart-laundromat](https://github.com/flookzajaju/smart-laundromat) — Spring Boot API, MongoDB storage, and the web dashboard
-
-## Author
-
-**Peeraphat Lampoothong**
-GitHub: [@flookzajaju](https://github.com/flookzajaju)
-
-## License
+License
 
 Academic project — created for coursework/portfolio purposes.
